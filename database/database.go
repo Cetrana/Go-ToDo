@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"todoApi/model"
 )
@@ -12,22 +12,24 @@ import (
 func getConnection() *sql.DB {
 	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
-		log.Fatal("Cannot connect to database", err)
+		log.WithError(err).Error("Cannot connect to database")
 	}
 	return db
 }
 
-func Todos() []model.Todo {
+func Todos() ([]model.Todo, error) {
 	db := getConnection()
 	defer db.Close()
 
 	stmt, err := db.Prepare("SELECT id, title, status FROM todos")
 	if err != nil {
-		log.Fatal("can't prepare statement", err)
+		log.WithError(err).Error("can't prepare statement")
+		return nil, err
 	}
 	rows, err := stmt.Query()
 	if err != nil {
-		log.Fatal("fail to get rows")
+		log.WithError(err).Error("fail to get rows")
+		return nil, err
 	}
 	var todos []model.Todo
 	for rows.Next() {
@@ -36,21 +38,23 @@ func Todos() []model.Todo {
 		var todo model.Todo
 		err = rows.Scan(&todo.Id, &todo.Title, &todo.Status)
 		if err != nil {
-			log.Fatal("can't scan row into var")
+			log.WithError(err).Error("can't scan row into var")
+			return nil, err
 		}
 		todos = append(todos, todo)
 		fmt.Println("one row", id, title, status)
 	}
-	return todos
+	return todos, nil
 }
 
-func Todo(queryId string) model.Todo {
+func Todo(queryId string) (model.Todo, error) {
 	db := getConnection()
 	defer db.Close()
 
 	stmt, err := db.Prepare("SELECT id, title, status FROM todos where id=$1")
 	if err != nil {
-		log.Fatal("can't prepare statement", err)
+		log.WithError(err).Error("can't prepare statement")
+		return model.Todo{}, err
 	}
 
 	row := stmt.QueryRow(queryId)
@@ -59,26 +63,29 @@ func Todo(queryId string) model.Todo {
 
 	err = row.Scan(&id, &title, &status)
 	if err != nil {
-		log.Fatal("can't scan row into var")
+		log.WithError(err).Error("can't scan row into var")
+		return model.Todo{}, err
 	}
 
-	return model.Todo{Id: id, Title: title, Status: status}
+	return model.Todo{Id: id, Title: title, Status: status}, nil
 }
-func UpdateTodo(updateTodo model.Todo) bool {
+func UpdateTodo(updateTodo model.Todo) error {
 	db := getConnection()
 	defer db.Close()
 
 	stmt, err := db.Prepare("UPDATE todos SET title=$2, status=$3 where id=$1")
 	if err != nil {
-		log.Fatal("can't prepare statement", err)
+		log.WithError(err).Error("can't prepare statement")
+		return err
 	}
 
 	if _, err := stmt.Exec(updateTodo.Id, updateTodo.Title, updateTodo.Status); err != nil {
-		log.Fatal("cannot update")
+		log.WithError(err).Error("cannot update")
+		return err
 	}
 
 	fmt.Println("update succes")
-	return true
+	return nil
 }
 
 func InsertTodo(todo model.Todo) model.Todo {
@@ -95,19 +102,21 @@ func InsertTodo(todo model.Todo) model.Todo {
 	fmt.Println("Insert todos success id : ", id)
 	return todo
 }
-func DeleteTodo(deleteID string) bool {
+func DeleteTodo(deleteID string) error {
 	db := getConnection()
 	defer db.Close()
 
 	stmt, err := db.Prepare("DELETE todos where id=$1")
 	if err != nil {
-		log.Fatal("can't prepare statement", err)
+		log.WithError(err).Error("can't prepare statement")
+		return err
 	}
 
 	if _, err := stmt.Exec(deleteID); err != nil {
-		log.Fatal("cannot delete")
+		log.WithError(err).Error("cannot delete")
+		return err
 	}
 
 	fmt.Println("update succes")
-	return true
+	return nil
 }

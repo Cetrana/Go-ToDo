@@ -18,11 +18,20 @@ func StartServer(url string) {
 }
 
 func getTodos(c *gin.Context) {
-	c.JSON(200, database.Todos())
+	if todos, err := database.Todos(); err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+	} else {
+		c.JSON(http.StatusOK, todos)
+	}
+
 }
 
 func getTodo(c *gin.Context) {
-	c.JSON(200, database.Todo(c.Param("id")))
+	if todo, err := database.Todo(c.Param("id")); err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+	} else {
+		c.JSON(http.StatusOK, todo)
+	}
 }
 
 func postTodo(c *gin.Context) {
@@ -31,7 +40,7 @@ func postTodo(c *gin.Context) {
 		c.String(http.StatusBadRequest, "bad request")
 		return
 	}
-	c.JSON(200, database.InsertTodo(todo))
+	c.JSON(http.StatusOK, database.InsertTodo(todo))
 
 }
 
@@ -41,18 +50,18 @@ func putTodo(c *gin.Context) {
 		c.String(http.StatusBadRequest, "bad request")
 		return
 	}
-	if database.UpdateTodo(todo) {
-		c.JSON(200, gin.H{"status": "success"})
+	if err := database.UpdateTodo(todo); err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
 	} else {
-		c.JSON(400, gin.H{"status": "failed"})
+		c.JSON(http.StatusOK, gin.H{"status": "success"})
 	}
 }
 
 func deleteTodo(c *gin.Context) {
-	if database.DeleteTodo(c.Param("id")) {
-		c.JSON(200, gin.H{"status": "deleted"})
+	if err := database.DeleteTodo(c.Param("id")) ; err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
 	} else {
-		c.JSON(400, gin.H{"status": "failed"})
+		c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 	}
 
 }
